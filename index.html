@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Open Media Divider Generator</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: settings column on the left (the OpenSCAD Customizer, group by group), live preview + output on the right; stacks on phones */
+:root {
+  --bg: #f1f0ec;        /* pegboard white */
+  --panel: #fbfaf7;
+  --line: #dcd9d1;
+  --fg: #23262b;
+  --muted: #6b6f76;
+  --accent: #4f6f99;    /* insert blue, deepened for text */
+  --accent-2: #5f8c6c;  /* insert green */
+  --accent-fg: #ffffff;
+  --err-bg: #fbeaea; --err-fg: #8a2b2b;
+  --warn-bg: #fbf3e2; --warn-fg: #7a5a12;
+  --view-bg: #e6e4de;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1b1d20; --panel: #23262a; --line: #363a40; --fg: #e8e6e1; --muted: #a0a4ab;
+  --accent: #8ea3be; --accent-2: #8fb39a; --accent-fg: #14171b;
+  --err-bg: #3a2424; --err-fg: #f1b7b7; --warn-bg: #3a3222; --warn-fg: #ead39b; --view-bg: #2a2d32; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #1b1d20; --panel: #23262a; --line: #363a40; --fg: #e8e6e1; --muted: #a0a4ab;
+  --accent: #8ea3be; --accent-2: #8fb39a; --accent-fg: #14171b;
+  --err-bg: #3a2424; --err-fg: #f1b7b7; --warn-bg: #3a3222; --warn-fg: #ead39b; --view-bg: #2a2d32; color-scheme: dark }
+
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+*, *::before, *::after { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1280px; margin: 0 auto; padding-block: 20px 32px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-bottom: 16px; }
+h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+header p { margin: 0; color: var(--muted); }
+.grid { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 820px) { .grid { grid-template-columns: minmax(0, 1fr); } .out { order: -1; } }
+
+/* settings */
+.settings { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+details { border-top: 1px solid var(--line); }
+details:first-child { border-top: 0; }
+summary { cursor: pointer; padding: 10px 14px; font-weight: 600; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--muted); list-style: none; display: flex; justify-content: space-between; align-items: center; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; font-family: var(--mono); font-weight: 400; }
+details[open] summary::after { content: "−"; }
+summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.fields { display: grid; gap: 14px; padding: 2px 14px 16px; }
+.field { display: grid; gap: 5px; min-width: 0; }
+.field.off { opacity: 0.45; }
+.field label { font-weight: 500; display: flex; justify-content: space-between; gap: 8px; }
+.field label code { font-family: var(--mono); font-size: 11.5px; color: var(--muted); font-weight: 400; }
+.help { color: var(--muted); font-size: 12.5px; margin: 0; }
+.help a { color: var(--accent); }
+ul.help { padding-left: 18px; display: grid; gap: 2px; }
+ul.help b { color: var(--fg); font-weight: 600; }
+.note { font-size: 12.5px; margin: 0; padding: 6px 10px; border-radius: 6px; background: var(--line); color: var(--fg); }
+.row { display: flex; align-items: center; gap: 10px; }
+.row input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.num { width: 76px; }
+input[type=text], input[type=number], select { font: inherit; font-family: var(--mono); font-size: 13px; padding: 6px 8px; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg); min-width: 0; }
+input[type=text], select { width: 100%; }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.check { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+/* output */
+.out { display: grid; gap: 12px; min-width: 0; }
+.viewer { position: relative; background: var(--view-bg); border: 1px solid var(--line); border-radius: 10px; aspect-ratio: 4 / 3; max-width: 100%; overflow: hidden; }
+.viewer canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.viewer .hint { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: var(--muted); pointer-events: none; }
+.viewer .status { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px; color: var(--muted); font-size: 13.5px; }
+.dims { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--mono); font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dims b { color: var(--fg); font-weight: 500; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.dlopts { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.dlopts label { display: inline-flex; gap: 6px; align-items: center; }
+.dlopts select { width: auto; }
+.dlopts input[type=number] { width: 4.2em; }
+button { font: inherit; font-weight: 600; border-radius: 7px; padding: 9px 16px; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--fg); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+button:disabled { opacity: 0.5; cursor: default; }
+.timing { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.timing.stale { font-family: inherit; font-size: 13px; color: #8a5a00; background: #fff3d6; border: 1px solid #f0c36d; border-radius: 6px; padding: 4px 10px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .timing.stale { color: #f5d08a; background: #3a2d10; border-color: #7a5a1a; } }
+:root[data-theme="dark"] .timing.stale { color: #f5d08a; background: #3a2d10; border-color: #7a5a1a; }
+.msgs { display: grid; gap: 6px; }
+.msg { border-radius: 7px; padding: 8px 12px; font-size: 13px; overflow-wrap: anywhere; }
+.msg.err { background: var(--err-bg); color: var(--err-fg); }
+.msg.warn { background: var(--warn-bg); color: var(--warn-fg); }
+.msg.ok { background: var(--panel); border: 1px solid var(--line); color: var(--muted); }
+details.log { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+details.log summary { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12.5px; }
+details.log pre { margin: 0; padding: 8px 14px 12px; font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Open Media Divider Generator</h1>
+    <p>Shelf divider labels with flush black lettering, generated in your browser from the OpenSCAD file. Printed face-down, so the visible face comes off the build plate.</p>
+  </header>
+  <div class="grid">
+    <form class="settings" id="settings" autocomplete="off"></form>
+    <section class="out" aria-label="Output">
+      <div class="viewer" id="viewer">
+        <div class="status" id="status">Loading OpenSCAD (about 14 MB, first time only)…</div>
+        <div class="hint" id="hint" hidden>Shown face-up · it prints face-down · drag to orbit, scroll or pinch to zoom</div>
+      </div>
+      <div class="dims" id="dims"></div>
+      <div class="actions">
+        <button class="primary" id="gen" type="button" disabled>Generate</button>
+        <button id="save" type="button" disabled>Download 3MF</button>
+        <span class="timing" id="timing"></span>
+      </div>
+      <div class="dlopts">
+        <label>Format <select id="dl_fmt"><option value="3mf">3MF: one object, two parts</option><option value="stl">STLs (.zip)</option></select></label>
+        <span id="dl_slots"><label>Body filament <input type="number" id="slot_body" min="1" max="16" step="1" value="1"></label>
+        <label>Letters filament <input type="number" id="slot_letters" min="1" max="16" step="1" value="2"></label></span>
+      </div>
+      <div class="msgs" id="msgs"></div>
+      <details class="log"><summary>OpenSCAD output</summary><pre id="log">Nothing yet.</pre></details>
+      <p class="help">The 3MF opens as one object with two parts, Body and Letters. Bambu Studio and OrcaSlicer also pre-assign the filaments set above; in other slicers, assign them yourself. With STLs, import both together as one object with two parts and move only the whole object, not the parts. Fonts: Inter, Barlow Semi Condensed, Roboto Condensed and Liberation Sans, all under the SIL Open Font License 1.1.</p>
+      <p class="help">Open Media Divider · free software under the <a href="https://github.com/TheGabeCodes/open-media-divider/blob/main/LICENSE">GNU GPL v3.0 or later</a> · <a href="https://github.com/TheGabeCodes/open-media-divider">source on GitHub</a></p>
+    </section>
+  </div>
+</div>
+
+<script type="text/plain" id="scad"></script>
+<script type="application/json" id="fonts">{}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(async function () {
+"use strict";
+// show any startup error on the page instead of hanging on "Loading…"
+window.addEventListener("error", (e) => { const st = document.getElementById("status"); if (st) { st.hidden = false; st.textContent = "Something went wrong: " + (e.message || e.error); } });
+
+const OPENSCAD_URL = "https://cdn.jsdelivr.net/npm/openscad-wasm@0.0.4/openscad.js";
+const $ = (id) => document.getElementById(id);
+// The .scad and fonts are either embedded in this page (single-file builds) or loaded from files next to it
+// (the GitHub Pages build: media_divider.scad and fonts/), so the repo's .scad is the one source of truth.
+let SCAD = $("scad").textContent, FONTS = null;
+if (SCAD.trim()) FONTS = JSON.parse($("fonts").textContent);
+else {
+  const st = $("status");
+  try {
+    const get = async (u, how) => { const r = await fetch(u); if (!r.ok) throw new Error(u + ": HTTP " + r.status); return r[how](); };
+    SCAD = await get("media_divider.scad", "text");
+    const b64 = (buf) => { const u = new Uint8Array(buf); let x = ""; for (let i = 0; i < u.length; i += 0x8000) x += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(x); };
+    FONTS = {};
+    for (const n of await get("fonts/fonts.json", "json")) FONTS[n] = b64(await get("fonts/" + encodeURIComponent(n), "arrayBuffer"));
+  } catch (err) {
+    st.hidden = false;
+    st.textContent = location.protocol === "file:"
+      ? "This page loads media_divider.scad and its fonts from the same folder, and browsers block that when the page is opened as a file. In a terminal, run  python3 -m http.server  in this folder, then open http://localhost:8000"
+      : "Could not load media_divider.scad or the fonts (" + (err && err.message || err) + "). Check that they are next to index.html.";
+    return;
+  }
+}
+
+// ---------- read the Customizer parameters out of the .scad ----------
+function parseCustomizer(src) {
+  const groups = []; let group = null, pending = [];
+  const head = src.split(/\n/);
+  for (const raw of head) {
+    const line = raw.trim();
+    const g = line.match(/^\/\*\s*\[(.+?)\]\s*\*\/$/);
+    if (g) { if (g[1] === "Hidden") break; group = { name: g[1], params: [] }; groups.push(group); pending = []; continue; }
+    if (!group) continue;
+    if (/^(module|function)\b/.test(line)) break;
+    if (line.startsWith("//")) { pending.push(line.replace(/^\/\/\s?/, "")); continue; }
+    const m = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+?);\s*(?:\/\/\s*(.*))?$/);
+    if (m) {
+      const [, name, valueSrc, opt] = m; let value, type;
+      if (/^".*"$/.test(valueSrc)) { type = "string"; value = valueSrc.slice(1, -1); }
+      else if (valueSrc === "true" || valueSrc === "false") { type = "bool"; value = valueSrc === "true"; }
+      else { type = "number"; value = Number(valueSrc); }
+      const p = { name, type, value, help: pending.join(" ") };
+      const range = opt && opt.match(/^\[\s*(-?[\d.]+)\s*:\s*(-?[\d.]+)\s*(?::\s*(-?[\d.]+))?\s*\]$/);
+      const list = opt && !range && opt.match(/^\[(.+)\]$/);
+      if (range) { const [a, b, c] = range.slice(1).map(Number); Object.assign(p, c === undefined || isNaN(c) ? { min: a, max: b, step: 1 } : { min: a, step: b, max: c }); }
+      else if (list) p.options = list[1].split(",").map((s) => {
+        s = s.trim();
+        const q = s.match(/^"(.*)"(?::(.*))?$/);   // "value" or "value":Label
+        if (q) return { v: q[1], l: (q[2] || q[1]).trim() };
+        const i = s.indexOf(":");                   // value:Label (OpenSCAD labeled list)
+        return i < 0 ? { v: s, l: s } : { v: s.slice(0, i).trim(), l: s.slice(i + 1).trim() };
+      });
+      group.params.push(p);
+    }
+    if (line && !line.startsWith("//")) pending = [];
+  }
+  return groups;
+}
+const GROUPS = parseCustomizer(SCAD);
+const ADVANCED = /advanced|temporary/i;
+
+// ---------- build the form ----------
+const form = $("settings");
+for (const g of GROUPS) {
+  const d = document.createElement("details");
+  d.open = !ADVANCED.test(g.name);
+  d.innerHTML = `<summary>${g.name}</summary><div class="fields"></div>`;
+  const box = d.querySelector(".fields");
+  for (const p of g.params) {
+    if (p.name === "part") continue;
+    const f = document.createElement("div"); f.className = "field";
+    const id = "p_" + p.name;
+    if (p.type === "bool") {
+      f.innerHTML = `<label class="check"><input type="checkbox" id="${id}"> <span></span></label>`;
+      f.querySelector("span").textContent = p.help || p.name;
+      f.querySelector("input").checked = p.value;
+    } else {
+      f.innerHTML = `<label for="${id}"><span></span><code>${p.name}</code></label>`;
+      f.querySelector("label span").textContent = labelFor(p);
+      let ctl;
+      if (p.options) {
+        ctl = document.createElement("select"); ctl.id = id;
+        for (const o of p.options) { const op = document.createElement("option"); op.value = o.v; op.textContent = o.l; ctl.append(op); }
+        ctl.value = String(p.value);
+        f.append(ctl);
+      } else if (p.type === "number" && p.min !== undefined) {
+        const row = document.createElement("div"); row.className = "row";
+        const r = document.createElement("input"); r.type = "range"; r.min = p.min; r.max = p.max; r.step = p.step; r.value = p.value; r.id = id + "_r";
+        r.setAttribute("aria-label", p.name);
+        ctl = document.createElement("input"); ctl.type = "number"; ctl.className = "num"; ctl.id = id; ctl.min = p.min; ctl.max = p.max; ctl.step = p.step; ctl.value = p.value;
+        r.addEventListener("input", () => { ctl.value = r.value; changed(); });
+        ctl.addEventListener("input", () => { r.value = ctl.value; });
+        row.append(r, ctl); f.append(row);
+      } else {
+        ctl = document.createElement("input"); ctl.type = p.type === "number" ? "number" : "text"; ctl.id = id; ctl.value = p.value;
+        f.append(ctl);
+      }
+      if (p.help) f.append(...helpNodes(p));
+    }
+    box.append(f);
+  }
+  form.append(d);
+}
+function labelFor(p) {
+  const nice = { label_text: "Label text", font: "Font", text_size: "Text size", letter_spacing: "Letter spacing", text_align: "Align",
+    text_end_inset: "Gap to edge", baseline_inset: "Baseline inset", panel_width: "Width", panel_height: "Height", thickness: "Thickness",
+    corner_radius: "Corner radius", strip_width: "Text strip width", type: "Type", window_margin: "Frame width", window_radius: "Window corner radius",
+    letter_layers: "Letter layers", layer_height: "Layer height", backing: "Backing", face_layers: "Face layers" };
+  return nice[p.name] || p.name.replace(/_/g, " ");
+}
+function helpFor(p) { return p.help; }
+// help text; for a dropdown whose help describes each option ("intro. a: … b: …"), show the options as a list
+function helpNodes(p) {
+  const txt = helpFor(p), opts = (p.options || []).map((o) => o.v).filter((v) => !/\W/.test(v));
+  if (opts.length > 1) {
+    const re = new RegExp("(?:^|\\s)(" + opts.join("|") + "):\\s", "g");
+    const hits = [...txt.matchAll(re)];
+    if (hits.length === opts.length) {
+      const out = [], intro = txt.slice(0, hits[0].index).trim();
+      if (intro) { const h = document.createElement("p"); h.className = "help"; h.textContent = intro; out.push(h); }
+      const ul = document.createElement("ul"); ul.className = "help";
+      hits.forEach((m, i) => {
+        const end = i + 1 < hits.length ? hits[i + 1].index : txt.length;
+        const li = document.createElement("li"), b = document.createElement("b");
+        b.textContent = m[1]; li.append(b, ": " + txt.slice(m.index + m[0].length, end).trim()); ul.append(li);
+      });
+      out.push(ul); return out;
+    }
+  }
+  const h = document.createElement("p"); h.className = "help"; h.textContent = txt; return [h];
+}
+// grey out settings that don't apply, with a visible note saying why (tooltips don't work on touch screens)
+function setOff(names, off, note) {
+  let first = null;
+  for (const n of names) {
+    const el = $("p_" + n); if (!el) continue;
+    el.disabled = off; const r = $("p_" + n + "_r"); if (r) r.disabled = off;
+    const f = el.closest(".field"); f.classList.toggle("off", off); first = first || f;
+  }
+  if (!first) return;
+  let msg = first.parentNode.querySelector(`.note[data-for="${names[0]}"]`);
+  if (!msg) { msg = document.createElement("p"); msg.className = "note"; msg.dataset.for = names[0]; msg.textContent = note; first.before(msg); }
+  msg.hidden = !off;
+}
+function updateType() {
+  const t = $("p_type"), b = $("p_backing");
+  if (t) setOff(["window", "window_margin", "window_radius"], t.value !== "full", "Only used when Type is full.");
+  if (b) setOff(["face_layers"], b.value !== "letters", "Only used when Backing is Letter colour.");
+}
+form.addEventListener("input", changed);
+form.addEventListener("change", changed);
+form.addEventListener("change", updateType);
+updateType();
+form.addEventListener("submit", (e) => e.preventDefault());
+
+function values() {
+  const v = {};
+  for (const g of GROUPS) for (const p of g.params) {
+    if (p.name === "part") continue;
+    const el = $("p_" + p.name);
+    v[p.name] = p.type === "bool" ? el.checked : p.type === "number" ? Number(el.value) : el.value;
+  }
+  return v;
+}
+function defines(v, part) {
+  const out = ["-D", `part="${part}"`];
+  for (const g of GROUPS) for (const p of g.params) {
+    if (p.name === "part") continue;
+    const x = v[p.name];
+    const s = p.type === "string" ? JSON.stringify(String(x)) : p.type === "bool" ? String(!!x) : String(Number(x));
+    out.push("-D", `${p.name}=${s}`);
+  }
+  return out;
+}
+
+// ---------- live size readout (from the same grid rules as the .scad) ----------
+function updateDims() {
+  const v = values();
+  const lh = v.layer_height, lay = (mm) => { const n = Math.round(mm / lh * 10) / 10; return `${n} layer${n === 1 ? "" : "s"}`; };
+  const face = v.backing === "letters" ? v.face_layers * lh : v.thickness, back = v.thickness - face;
+  $("dims").innerHTML = [`<span>Panel <b>${fmt(v.panel_width)} × ${fmt(v.panel_height)} × ${fmt(v.thickness)} mm</b></span>`,
+    `<span>Letters <b>${fmtd(v.letter_layers * lh)} mm</b> (${lay(v.letter_layers * lh)})</span>`]
+    .concat(v.backing === "letters" ? [`<span>Face <b>${fmtd(face)} mm</b> (${lay(face)}) · Backing <b>${fmtd(back)} mm</b> (${lay(back)})</span>`] : []).join("");
+}
+const fmt = (n) => (Math.round(n * 100) / 100).toString();
+const fmtd = (n) => n.toFixed(2).replace(/0$/, "");   // depths: 1.0, 0.4, 0.16
+
+// ---------- OpenSCAD in a worker ----------
+const WORKER_SRC = `
+self.onmessage = async (e) => {
+  if (e.data === "ping") { self.postMessage("pong"); return; }
+  const { url, src, args, id, fonts } = e.data;
+  const log = [];
+  try {
+    const t0 = performance.now();
+    const { createOpenSCAD } = await import(url);
+    const o = await createOpenSCAD({ noInitialRun: true, print: (s) => log.push(s), printErr: (s) => log.push(s) });
+    const t1 = performance.now();
+    const inst = o.getInstance();
+    inst.FS.mkdir("/fonts");
+    for (const [n, b64] of Object.entries(fonts)) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); inst.FS.writeFile("/fonts/" + n, u); }
+    inst.FS.writeFile("/fonts/fonts.conf", '<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd"><fontconfig><dir>/fonts</dir></fontconfig>');
+    inst.FS.writeFile("/in.scad", src);
+    try { inst.callMain(["/in.scad", "-o", "/out.stl", "--backend=manifold", "--export-format=binstl", ...args]); }
+    catch (err) { log.push(String(err && err.message || err)); }
+    let out = null; try { out = inst.FS.readFile("/out.stl"); } catch (_) {}
+    self.postMessage({ id, out, log, tLoad: t1 - t0, tRender: performance.now() - t1 }, out ? [out.buffer] : []);
+  } catch (err) { self.postMessage({ id, out: null, log: log.concat(["Could not start OpenSCAD: " + (err && err.message || err)]) }); }
+};`;
+let worker = null;
+try { worker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: "text/javascript" })), { type: "module" }); } catch (_) { worker = null; }
+// make sure the background worker actually runs (some browsers, e.g. a page opened as a local file, fail silently)
+const workerOK = !worker ? Promise.resolve(false) : new Promise((res) => {
+  const t = setTimeout(() => res(false), 4000);
+  worker.addEventListener("message", (e) => { if (e.data === "pong") { clearTimeout(t); res(true); } });
+  worker.addEventListener("error", () => { clearTimeout(t); res(false); });
+  worker.postMessage("ping");
+});
+let reqId = 0;
+async function runOpenSCAD(args) {
+  if (worker && await workerOK) {
+    const r = await runInWorker(args);
+    if (!r.log.some((l) => l.startsWith("Could not start OpenSCAD"))) return r;
+  }
+  worker = null;   // background worker unavailable here: run in the page itself
+  return runInPage(args);
+}
+function runInWorker(args) {
+  const id = ++reqId;
+  return new Promise((res) => {
+    const on = (e) => { if (e.data && e.data.id === id) { worker.removeEventListener("message", on); res(e.data); } };
+    worker.addEventListener("message", on);
+    worker.addEventListener("error", () => res({ id, out: null, log: ["Could not start OpenSCAD: background worker error"] }), { once: true });
+    worker.postMessage({ url: OPENSCAD_URL, src: SCAD, args, id, fonts: FONTS });
+    setTimeout(() => res({ id, out: null, log: ["Could not start OpenSCAD: timed out in background worker"] }), 90000);
+  });
+}
+async function runInPage(args) {
+  const id = ++reqId;
+  const log = []; const t0 = performance.now();
+  let createOpenSCAD;
+  try { ({ createOpenSCAD } = await import(OPENSCAD_URL)); }
+  catch (err) { return { id, out: null, log: ["Could not load OpenSCAD in this browser: " + (err && err.message || err)] }; }
+  const o = await createOpenSCAD({ noInitialRun: true, print: (s) => log.push(s), printErr: (s) => log.push(s) });
+  const t1 = performance.now(); const inst = o.getInstance();
+  inst.FS.mkdir("/fonts");
+  for (const [n, b64] of Object.entries(FONTS)) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); inst.FS.writeFile("/fonts/" + n, u); }
+  inst.FS.writeFile("/fonts/fonts.conf", '<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd"><fontconfig><dir>/fonts</dir></fontconfig>');
+  inst.FS.writeFile("/in.scad", SCAD);
+  try { inst.callMain(["/in.scad", "-o", "/out.stl", "--backend=manifold", "--export-format=binstl", ...args]); } catch (err) { log.push(String(err)); }
+  let out = null; try { out = inst.FS.readFile("/out.stl"); } catch (_) {}
+  return { id, out, log, tLoad: t1 - t0, tRender: performance.now() - t1 };
+}
+
+// ---------- 3D preview (optional: the generator still works if it can't start) ----------
+const viewer = $("viewer");
+let renderer = null, scene, camera, controls, grid, model = null;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  viewer.prepend(renderer.domElement);
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(35, 4 / 3, 1, 5000);
+  camera.up.set(0, 0, 1);
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f99, 0.85));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(-1, -2, 3); scene.add(sun);
+  grid = new THREE.GridHelper(400, 20, 0x9a9a9a, 0xc9c6bf); grid.rotation.x = Math.PI / 2; grid.material.transparent = true; grid.material.opacity = 0.45; scene.add(grid);
+  const resize = () => { const r = viewer.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); camera.aspect = r.width / Math.max(r.height, 1); camera.updateProjectionMatrix(); };
+  new ResizeObserver(resize).observe(viewer); resize();
+  (function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+} catch (err) { renderer = null; console.warn("3D preview unavailable", err); }
+function showModel(parts) {   // parts: [[arraybuffer, colorHex], ...]
+  if (!renderer) { $("status").hidden = false; $("status").textContent = "Parts generated. (3D preview isn't available in this browser.)"; return; }
+  if (model) { scene.remove(model); model.traverse((o) => { o.geometry && o.geometry.dispose(); o.material && o.material.dispose && o.material.dispose(); }); }
+  model = new THREE.Group();
+  for (const [buf, colorHex] of parts) {
+    const geo = new THREE.STLLoader().parse(buf);
+    model.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.8, metalness: 0, flatShading: true })));
+    model.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x3b3f46, transparent: true, opacity: 0.35 })));
+  }
+  model.rotation.y = Math.PI;   // flip over so the printed-down face is shown face-up, reading correctly
+  scene.add(model);
+  const bb = new THREE.Box3().setFromObject(model), size = new THREE.Vector3(), mid = new THREE.Vector3();
+  bb.getSize(size); bb.getCenter(mid);
+  grid.position.set(mid.x, mid.y, bb.min.z - 0.01);
+  const r = size.length() * 0.5;
+  controls.target.copy(mid);
+  camera.position.set(mid.x + r * 0.3, mid.y - r * 1.5, mid.z + r * 2.9);
+  camera.near = r / 50; camera.far = r * 50; camera.updateProjectionMatrix();
+  $("hint").hidden = false;
+}
+
+// ---------- generate / save ----------
+let last = null;
+const status = $("status");
+// after a change, the last generated model no longer matches the settings: block Download until Generate
+function changed() {
+  updateDims();
+  if (last) {
+    $("save").disabled = true;
+    const t = $("timing"); t.textContent = "You have changes that aren't generated yet. Press Generate first."; t.classList.add("stale");
+  }
+}
+function niceAssert(line) {
+  const m = line.match(/Assertion .* failed: "(.*)"/); if (m) return m[1];
+  return line.replace(/^ERROR:\s*/, "").replace(/ in file \/in\.scad, line \d+$/, "");
+}
+function fileBase(v) {
+  const slug = (v.label_text || "Label").normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_").slice(0, 40) || "Label";
+  return `Divider_${slug}`;
+}
+// read the extent of a binary STL (for the cut-off check)
+function stlBounds(u8, zmax = Infinity) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), n = dv.getUint32(80, true);
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) for (let c = 0; c < 3; c++) {
+    const o = 84 + i * 50 + 12 + k * 12;
+    if (dv.getFloat32(o + 8, true) > zmax) continue;   // skip the backing (above the letters)
+    const x = dv.getFloat32(o + c * 4, true); if (x < mn[c]) mn[c] = x; if (x > mx[c]) mx[c] = x; }
+  return { mn, mx, found: mn[0] !== Infinity };
+}
+async function generate() {
+  const v = values();
+  $("gen").disabled = true; $("save").disabled = true; $("msgs").innerHTML = "";
+  status.hidden = false; status.textContent = "Generating…"; $("timing").textContent = "";
+  const t0 = performance.now();
+  const rw = await runOpenSCAD(defines(v, "white"));
+  const rb = rw.out ? await runOpenSCAD(defines(v, "black")) : { out: null, log: [] };
+  $("gen").disabled = false;
+  const log = rw.log.concat(rb.log.length ? ["", "--- letters ---"] : [], rb.log);
+  $("log").textContent = log.join("\n") || "(no output)";
+  const errs = [...new Set(log.filter((l) => /^ERROR|Assertion/.test(l)))];
+  const warns = [...new Set(log.filter((l) => /^WARNING/.test(l)))];
+  for (const e of errs) addMsg("err", niceAssert(e));
+  for (const w of warns.slice(0, 3)) addMsg("warn", w.replace(/^WARNING:\s*/, ""));
+  for (const l of log.filter((l) => /^Could not (start|load) OpenSCAD/.test(l))) addMsg("err", l);
+  if (!rw.out || rw.out.byteLength < 200 || errs.length) {
+    last = null; status.hidden = false;
+    status.textContent = errs.length ? "Not generated. See the message below." : "Not generated. See OpenSCAD output below.";
+    return;
+  }
+  const hasBlack = rb.out && rb.out.byteLength >= 200;
+  const b = hasBlack ? stlBounds(rb.out, v.letter_layers * v.layer_height + 0.01) : null, m = 0.3;   // letters only
+  const hasLetters = hasBlack && b.found;
+  if (!hasLetters) addMsg("warn", "No letters were generated. Check the label text and that it fits on the panel.");
+  else {   // letters clipped by the panel or the window?
+    if (b.mn[1] < m || b.mx[1] > v.panel_height - m || b.mn[0] < m || b.mx[0] > v.panel_width - m)
+      addMsg("warn", "The text reaches the edge of the panel and is probably cut off. Shorten it, make it smaller, or change the alignment.");
+    else if (v.type === "full" && v.window && (v.panel_width - b.mn[0]) > v.strip_width - m)
+      addMsg("warn", "The text runs into the window. Reduce the text size or baseline inset, or widen the text strip.");
+  }
+  status.hidden = true;
+  const ab = (u) => u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength);
+  last = { white: rw.out, black: hasBlack ? rb.out : null, base: fileBase(v) };
+  showModel([[ab(rw.out), 0xf3f1ec]].concat(hasBlack ? [[ab(rb.out), 0x2a2a2a]] : []));
+  $("save").disabled = false; $("timing").classList.remove("stale");
+  $("timing").textContent = `OpenSCAD ${(((performance.now() - t0)) / 1000).toFixed(1)} s · render ${(((rw.tRender || 0) + (rb.tRender || 0)) / 1000).toFixed(1)} s`;
+}
+function addMsg(kind, text) { const d = document.createElement("div"); d.className = "msg " + kind; d.textContent = text; $("msgs").append(d); }
+
+// ---------- 3MF: one object with two parts (Body, Letters) ----------
+// Standard 3MF core: each part is its own mesh object; a parent object lists them as components.
+// Bambu Studio / OrcaSlicer turn the components into parts of one object and read the per-part filament
+// from Metadata/model_settings.config (also for 3MFs they didn't write). Other slicers get the geometry.
+function stlToMesh(u8) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength), n = dv.getUint32(80, true);
+  const idx = new Map(), verts = [], tris = new Uint32Array(n * 3);
+  for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) {
+    const o = 84 + i * 50 + 12 + k * 12;
+    const x = dv.getFloat32(o, true), y = dv.getFloat32(o + 4, true), z = dv.getFloat32(o + 8, true);
+    const key = x + "," + y + "," + z;
+    let v = idx.get(key);
+    if (v === undefined) { v = verts.length / 3; idx.set(key, v); verts.push(x, y, z); }
+    tris[i * 3 + k] = v;
+  }
+  return { verts, tris };
+}
+function meshXml(m) {
+  const out = ["<mesh><vertices>"], r = (x) => +x.toFixed(5);
+  for (let i = 0; i < m.verts.length; i += 3) out.push(`<vertex x="${r(m.verts[i])}" y="${r(m.verts[i + 1])}" z="${r(m.verts[i + 2])}"/>`);
+  out.push("</vertices><triangles>");
+  for (let i = 0; i < m.tris.length; i += 3) {
+    const a = m.tris[i], b = m.tris[i + 1], c = m.tris[i + 2];
+    if (a !== b && b !== c && a !== c) out.push(`<triangle v1="${a}" v2="${b}" v3="${c}"/>`);
+  }
+  out.push("</triangles></mesh>");
+  return out.join("");
+}
+const xmlEsc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function make3mf(base, parts) {   // parts: [{ name, stl, slot }]
+  const zip = new JSZip(), pid = parts.length + 1, F = { createFolders: false };
+  zip.file("[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+    + '<Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>'
+    + '<Default Extension="config" ContentType="text/xml"/></Types>', F);
+  zip.file("_rels/.rels", '<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    + '<Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>', F);
+  const model = ['<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">',
+    `<metadata name="Title">${xmlEsc(base)}</metadata>`, '<metadata name="Application">Open Media Divider Generator</metadata>', "<resources>"];
+  parts.forEach((p, i) => model.push(`<object id="${i + 1}" type="model" name="${xmlEsc(p.name)}">${meshXml(stlToMesh(p.stl))}</object>`));
+  model.push(`<object id="${pid}" type="model" name="${xmlEsc(base)}"><components>`
+    + parts.map((p, i) => `<component objectid="${i + 1}"/>`).join("") + "</components></object>");
+  model.push(`</resources><build><item objectid="${pid}"/></build></model>`);
+  zip.file("3D/3dmodel.model", model.join("\n"), F);
+  zip.file("Metadata/model_settings.config", '<?xml version="1.0" encoding="UTF-8"?>\n<config>\n'
+    + `  <object id="${pid}">\n    <metadata key="name" value="${xmlEsc(base)}"/>\n    <metadata key="extruder" value="${parts[0].slot}"/>\n`
+    + parts.map((p, i) => `    <part id="${i + 1}" subtype="normal_part">\n      <metadata key="name" value="${xmlEsc(p.name)}"/>\n      <metadata key="extruder" value="${p.slot}"/>\n    </part>\n`).join("")
+    + "  </object>\n</config>\n", F);
+  return zip.generateAsync({ type: "blob", compression: "DEFLATE", mimeType: "model/3mf" });
+}
+const slotVal = (id, d) => { const n = Math.round(Number($(id).value)); return n >= 1 && n <= 16 ? n : d; };
+function updateDl() {
+  const is3 = $("dl_fmt").value === "3mf";
+  $("dl_slots").hidden = !is3;
+  $("save").textContent = is3 ? "Download 3MF" : "Download STLs (.zip)";
+  try { localStorage.setItem("omd_dl", JSON.stringify({ f: $("dl_fmt").value, b: $("slot_body").value, l: $("slot_letters").value })); } catch (_) {}
+}
+try { const d = JSON.parse(localStorage.getItem("omd_dl") || "null"); if (d) { $("dl_fmt").value = d.f === "stl" ? "stl" : "3mf"; $("slot_body").value = d.b || 1; $("slot_letters").value = d.l || 2; } } catch (_) {}
+for (const id of ["dl_fmt", "slot_body", "slot_letters"]) $(id).addEventListener("change", updateDl);
+updateDl();
+
+async function save() {
+  if (!last) return;
+  let blob, filename;
+  if ($("dl_fmt").value === "3mf") {
+    const parts = [{ name: "Body", stl: last.white, slot: slotVal("slot_body", 1) }];
+    if (last.black) parts.push({ name: "Letters", stl: last.black, slot: slotVal("slot_letters", 2) });
+    blob = await make3mf(last.base, parts); filename = last.base + ".3mf";
+  } else {
+    const zip = new JSZip();
+    zip.file(last.base + "_Body_White.stl", last.white);
+    if (last.black) zip.file(last.base + "_Letters_Black.stl", last.black);
+    blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" }); filename = last.base + ".zip";
+  }
+  const dl = window.claude ? await window.claude.use("downloads").catch(() => null) : null;   // inside claude.ai
+  if (dl) {
+    try { await dl.save({ filename, data: blob }); addMsg("ok", "Saved " + filename); }
+    catch (e) { if (e && e.code !== "declined") addMsg("warn", "Download not available here (" + (e.code || "error") + ")."); }
+    return;
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; a.click();   // outside claude.ai
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+$("gen").addEventListener("click", generate);
+$("save").addEventListener("click", save);
+updateDims();
+
+// warm up: fetch + compile once so the first Generate is quicker, then make the default part
+(async () => {
+  status.textContent = "Loading OpenSCAD (about 14 MB, first time only)…";
+  $("gen").disabled = false;
+  await generate();
+})();
+})();
+</script>
+
+</body>
+</html>
